@@ -149,7 +149,18 @@ func cmdUninstall(c *cli.Context) error {
 		}
 	}()
 
-	// collect buckets before deleting the stacks
+	success := true
+	var deleteErr error
+
+	// Delete all Service, App and Rack stacks
+	err = deleteStacks("resource", rackName, CF)
+	if err != nil {
+		stdcli.QOSEventSend("cli-uninstall", distinctId, stdcli.QOSEventProperties{Error: err})
+		success = false
+		deleteErr = err
+	}
+
+	// collect remaining buckets before deleting the app and rack stacks
 	buckets := []string{}
 	for _, s := range stacks.all() {
 		stack := rackName
@@ -161,22 +172,12 @@ func cmdUninstall(c *cli.Context) error {
 		if err != nil {
 			stdcli.Error(fmt.Errorf("Unable to gather buckets for %s, skipping", stack))
 			stdcli.QOSEventSend("cli-uninstall", distinctId, stdcli.QOSEventProperties{Error: err})
+			success = false
 			continue
 		}
 
 		buckets = append(buckets, bs...)
 		time.Sleep(2 * time.Second)
-	}
-
-	success := true
-	var deleteErr error
-
-	// Delete all Service, App and Rack stacks
-	err = deleteStacks("resource", rackName, CF)
-	if err != nil {
-		stdcli.QOSEventSend("cli-uninstall", distinctId, stdcli.QOSEventProperties{Error: err})
-		success = false
-		deleteErr = err
 	}
 
 	err = deleteStacks("app", rackName, CF)
